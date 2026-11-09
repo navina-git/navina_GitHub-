@@ -1,0 +1,38 @@
+#include <SPI.h>
+#include <RF24.h>
+
+// CE = 9, CSN = 10
+RF24 radio(9, 10);
+
+void setup() 
+{
+  Serial.begin(9600);
+  delay(1000);
+
+  Serial.println("nRF24L01+ Module Detection");
+
+  if (radio.begin())
+  {
+    Serial.println("nRF24L01+ Module DETECTED!");
+
+    if (radio.isChipConnected())
+    {
+      Serial.println("SPI Communication: SUCCESS");
+      Serial.println("NRF24L01+ is WORKING");
+    }
+    else
+    {
+      Serial.println("SPI Communication: FAILED");
+      Serial.println("Check wiring and power supply");
+    }
+  }
+  else
+  {
+    Serial.println("nRF24L01+ NOT DETECTED!");
+    Serial.println("Check connections and 3.3V supply");
+  }
+}
+
+void loop() 
+{
+}

@@ -1,0 +1,90 @@
+import torch
+import cv2
+import torchvision
+from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
+# ---------------------------
+# 1. Setup
+# ---------------------------
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+num_classes = 2  # background + drone
+
+# ---------------------------
+# 2. Load Model
+# ---------------------------
+model = fasterrcnn_resnet50_fpn(weights=None)
+
+in_features = model.roi_heads.box_predictor.cls_score.in_features
+model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+
+# Load trained weights
+model.load_state_dict(torch.load("outputs/model_1.pth", map_location=device))
+
+model.to(device)
+model.eval()
+
+print("✅ Model loaded")
+
+# ---------------------------
+# 3. Load Image
+# ---------------------------
+image_path = "test.jpg"  # 🔁 change this to your image
+
+img = cv2.imread(image_path)
+
+if img is None:
+    print("❌ Image not found. Check path!")
+    exit()
+
+orig = img.copy()
+
+# Convert BGR → RGB
+img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+# Normalize
+img = img / 255.0
+
+# Convert to tensor
+img = torch.tensor(img, dtype=torch.float32).permute(2, 0, 1).to(device)
+
+# ---------------------------
+# 4. Prediction
+# ---------------------------
+with torch.no_grad():
+    outputs = model([img])
+
+# Get predictions
+boxes = outputs[0]['boxes'].cpu().numpy()
+scores = outputs[0]['scores'].cpu().numpy()
+labels = outputs[0]['labels'].cpu().numpy()
+
+# ---------------------------
+# 5. Draw Bounding Boxes
+# ---------------------------
+threshold = 0.5  # confidence threshold
+
+for i in range(len(boxes)):
+    if scores[i] >= threshold:
+        x1, y1, x2, y2 = boxes[i].astype(int)
+
+        # Draw rectangle
+        cv2.rectangle(orig, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+        # Put label + score
+        text = f"Drone: {scores[i]:.2f}"
+        cv2.putText(orig, text, (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+# ---------------------------
+# 6. Show Output
+# ---------------------------
+cv2.imshow("Drone Detection", orig)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+# Save output image
+cv2.imwrite("output.jpg", orig)
+
+print("✅ Detection complete. Output saved as output.jpg")
